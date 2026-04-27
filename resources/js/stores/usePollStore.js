@@ -11,11 +11,19 @@ export function usePollStore() {
   }
 
   async function deletePoll(id) {
-    const result = await fetchApi({ url: 'polls/' + id, method: 'DELETE' });
+    const result = await fetchApi({ url: 'polls/' + id, method: 'DELETE' }); //back
     if (result) {
-      polls.value = polls.value.filter(p => p.id !== id);
+      polls.value = polls.value.filter(p => p.id !== id); //front
     }
   }
+    async function deletePolls(ids) {
+        for (const id of ids) {
+        const result = await fetchApi({ url: 'polls/' + id, method: 'DELETE' }); //back
+        if (result) {
+            polls.value = polls.value.filter(p => p.id !== id); //front
+        }}
+    }
+
 
   return { polls, setPolls, deletePoll };
 }

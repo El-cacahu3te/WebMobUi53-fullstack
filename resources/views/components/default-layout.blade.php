@@ -19,6 +19,7 @@
     @isset($scripts)
         {{ $scripts }}
     @endisset
+
 </head>
 
 <body class="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-900">
@@ -33,6 +34,11 @@
                         class="block bg-teal-700 dark:bg-purple-900 px-3 py-1 rounded-md hover:bg-teal-800 dark:hover:bg-purple-800">
                         {{ __('ui.posts.index.title') }}
                     </a>
+                    <a href="{{ url('/polls/dashboard') }}"
+                            class="block bg-teal-700 dark:bg-purple-900 px-3 py-1 rounded-md hover:bg-teal-800 dark:hover:bg-purple-800">
+                            Sondages
+                        </a> //bouton accès page polls/dashboard
+
                 </div>
 
                 @auth
@@ -57,6 +63,7 @@
                             class="block bg-teal-700 dark:bg-purple-900 px-3 py-1 rounded-md hover:bg-teal-800 dark:hover:bg-purple-800 transition">
                             {{ __('ui.auth.register.title') }}
                         </a>
+
                     </div>
                 @endauth
             </div>

@@ -140,7 +140,7 @@ class DatabaseSeeder extends Seeder
                 ]);
 
                 // Insert 10 test polls for John Doe
-                for ($i = 1; $i <= 10; $i++) {
+                for ($i = 1; $i <= 30; $i++) {
                     DB::table('polls')->insert([
                         'id' => $i,
                         'user_id' => 1,

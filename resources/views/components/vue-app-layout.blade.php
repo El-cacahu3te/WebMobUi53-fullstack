@@ -22,6 +22,7 @@
     @isset($scripts)
         {{ $scripts }}
     @endisset
+
 </head>
 
 <body {{ $attributes->class([$bodyClass]) }}>

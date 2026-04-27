@@ -28,6 +28,7 @@
       <tr v-for="poll in polls" :key="poll.id">
         <td class="border px-3 py-2"><button @click="delPoll(poll.id)">Supp.</button></td>
         <td class="border px-3 py-2">{{ poll.id }}</td>
+
         <td class="border px-3 py-2">{{ poll.title || '-' }}</td>
         <td class="border px-3 py-2">{{ poll.question }}</td>
         <td class="border px-3 py-2">{{ poll.is_draft ? 'Oui' : 'Non' }}</td>
