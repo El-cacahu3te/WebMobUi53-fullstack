@@ -9,9 +9,12 @@ const props = defineProps({
 
 const { fetchApi } = useFetchApi('/api/v1');
 
+// Règle : au moment de la création, un sondage doit être en brouillon par défaut.
+// (On force donc is_draft=true côté frontend.)
 const isDraftInitial = props.mode === 'create'
-? false  // création = actif par défaut
-: props.initialPoll?.is_draft ?? false;
+  ? true
+  : (props.initialPoll?.is_draft ?? false);
+
 
 
 const form = reactive({

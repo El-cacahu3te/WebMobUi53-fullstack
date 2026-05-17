@@ -4,7 +4,8 @@ import { useFetchApi } from '@/composables/useFetchApi';
 const polls = ref([]);
 
 export function usePollStore() {
-  const { fetchApi } = useFetchApi();
+    const { fetchApi } = useFetchApi('/api/v1');
+
 
   function setPolls(data) {
     polls.value = data;

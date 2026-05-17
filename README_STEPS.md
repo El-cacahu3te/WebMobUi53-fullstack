@@ -129,7 +129,7 @@ Pour ne pas laisser des options orphelines en base si le sondage parent est supp
 - **Pas de Pinia** : le formulaire est local à la page, pas besoin de store global
 - **Brouillon par défaut** : règle métier confirmée — un sondage ne doit jamais être actif sans action explicite du créateur
 
-# Étape 4 — Lien de partage + Page de vote + Page de résultats
+## Étape 4 et 5— Lien de partage + Page de vote + Page de résultats
 
 ## Ce qui a été fait
 
@@ -259,6 +259,31 @@ Pour ne pas laisser des options orphelines en base si le sondage parent est supp
 |`resources/views/polls/results.blade.php`|Page Blade résultats|🆕 Nouveau|
 |`resources/js/composables/useFetchApi.js`|HTTP helper|✅ Oui|
 |`routes/web.php`|Routes vote/results|✅ Oui|
+
+## Étape 6 — Affichage conditionnel (état, droits, date de fin)
+
+### Ce qui a été fait
+
+**`AppPollVote.vue`**
+
+- Sondage en brouillon (`is_draft = true`) → message d'avertissement, formulaire de vote masqué
+- Sondage expiré (`ends_at` dépassé, calculé côté client via `computed`) → message "terminé", formulaire masqué, lien vers les résultats
+- Erreurs API métier distinguées : déjà voté, sondage fermé, brouillon — chacune avec un message utilisateur lisible
+- Vote réussi → redirection automatique vers les résultats après 2s
+
+**`AppPollResults.vue`**
+
+- Erreur 403 → message "Résultats privés" dédié (au lieu d'un message d'erreur générique)
+- Badge statut dynamique : "Actif — résultats en direct" ou "Terminé"
+- Polling automatique toutes les 5s — **s'arrête automatiquement** si le sondage est expiré ou si les résultats sont privés (évite des requêtes inutiles)
+- Nettoyage de l'intervalle dans `onUnmounted` pour éviter les fuites mémoire
+
+### Pourquoi ces choix techniques
+
+- **`computed` pour `isExpired`** : recalculé automatiquement si `ends_at` change, sans logique manuelle. La date est comparée côté client — suffisant pour l'UX, le backend reste la source de vérité pour bloquer le vote.
+- **Distinction 403 vs autres erreurs** : `useFetchApi` expose `err.status`, ce qui permet de séparer "résultats privés" (cas normal) d'une vraie erreur réseau.
+- **Arrêt du polling si expiré** : inutile de poller un sondage terminé, ça économise des requêtes sans complexité supplémentaire.
+- **`onUnmounted` + `clearInterval`** : bonne pratique Vue — sans ça, l'intervalle continue même si le composant est détruit.
 
 
 ## Consignes générales

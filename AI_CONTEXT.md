@@ -2,7 +2,22 @@
 
 ## 1. Stack & configuration détectée
 
+## 0. Exigences fonctionnelles (résumé)
+
+- Créer un sondage (question, options, paramètres) depuis l’interface Vue.
+- Gérer le statut : **brouillon** (non votable) puis **actif**.
+- Permettre choix **simple** (un seul choix) ou **multiple**.
+- Permettre `results_public` : résultats visibles publiquement uniquement si activé (sinon réservés au créateur).
+- Permettre une **durée** (date de fin) et empêcher le vote après expiration.
+- Proposer un **lien de partage** contenant un token dans l’URL.
+- Page de **vote** accessible via token : **requiert authentification**.
+- Page **résultats** accessible via token : **public si `results_public`**, sinon restreint.
+- Afficher sur la page de vote des **résultats en direct** via polling + aperçu graphique.
+- Empêcher le vote lorsque la date de fin est dépassée (affichage clair).
+- Garantir côté frontend et API l’**unicité** du vote pour les sondages à choix unique.
+
 - Backend: Laravel projet (`composer.json` avec `laravel/framework` `^12.0`, PHP `^8.2`).
+
 - Frontend: Vue 3 (`vue` `^3.5.18`, `@vitejs/plugin-vue`), Vite 7, Tailwind CSS 4 via `@tailwindcss/vite`.
 
 - Documentation: `README_STEPS.md` documente l’alignement de la fonctionnalité “lien de partage token + accès au sondage via lien” comme **critère rendu #5** (plutôt qu’une “Étape 5” technique dédiée), et la fonctionnalité est couverte techniquement via les pages vote/résultats et les endpoints token.
@@ -131,7 +146,8 @@
 
 - `resources/js/components/PollForm.vue`
   - Formulaire dynamique de création/édition de sondage.
-  - **Création** : sondage actif par défaut (`is_draft = false`).
+- **Création** : sondage en brouillon par défaut (`is_draft = true`) afin qu’un sondage n’entre en actif que lorsqu’il est explicitement publié.
+
   - **Durée** : affichée en jours (conversion ×86400 secondes). Désactivée si brouillon, activée si actif.
   - Gère les options dynamiques (ajout/suppression) et les paramètres `is_draft`, `allow_multiple_choices`, `allow_vote_change`, `results_public`, `duration`.
   - Message clair : « La durée ne s'applique que si le sondage est actif ».

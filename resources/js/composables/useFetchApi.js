@@ -78,7 +78,13 @@ export function useFetchApi(baseUrl = null, additionalHeaders = {}) {
         signal: controller.signal,
       })
       .then(response => {
-        clearTimeout(timer);
+          clearTimeout(timer);
+
+          // 204 No Content : pas de body, on resolve directement
+          if (response.status === 204) {
+              resolve(null);
+              return;
+          }
 
         const responseClone = response.clone(); // Clone the response to use it twice if needed
 
