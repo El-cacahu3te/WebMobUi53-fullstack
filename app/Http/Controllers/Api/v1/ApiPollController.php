@@ -99,7 +99,13 @@ class ApiPollController extends Controller
 
 
     $wasDraft = $poll->is_draft;
+    $oldDuration = $poll->duration;
     $poll->update($validated);
+
+    // Bloque la modif des options si sondage déjà actif
+    if (isset($validated['options']) && !$wasDraft) {
+        return response()->json(['message' => 'Impossible de modifier les options d\'un sondage actif.'], 422);
+    }
 
     // Si on envoie de nouvelles options, on remplace tout
     if (isset($validated['options'])) {
@@ -109,12 +115,19 @@ class ApiPollController extends Controller
         }
     }
 
-    // Si on bascule d'un brouillon vers publié, met à jour les dates de début/fin
-    if (isset($validated['is_draft']) && $validated['is_draft'] === false && $wasDraft) {
+
+    $durationChanged = array_key_exists('duration', $validated) && $validated['duration'] !== $oldDuration;
+    $becameActive = isset($validated['is_draft']) && $validated['is_draft'] === false && $wasDraft;
+
+    if (!$poll->is_draft && ($becameActive || $durationChanged || !$poll->started_at)) {
         $poll->started_at = $poll->started_at ?? now();
+
         if ($poll->duration) {
             $poll->ends_at = now()->addSeconds($poll->duration);
+        } else {
+            $poll->ends_at = null;
         }
+
         $poll->save();
     }
 

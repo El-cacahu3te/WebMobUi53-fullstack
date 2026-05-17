@@ -9,14 +9,18 @@ const props = defineProps({
 
 const { fetchApi } = useFetchApi('/api/v1');
 
+const isDraftInitial = props.mode === 'create'
+  ? true
+  : props.initialPoll?.is_draft ?? true;
+
 const form = reactive({
   title: props.initialPoll?.title ?? '',
   question: props.initialPoll?.question ?? '',
-  is_draft: props.initialPoll?.is_draft ?? false,
+  is_draft: isDraftInitial,
   allow_multiple_choices: props.initialPoll?.allow_multiple_choices ?? false,
   allow_vote_change: props.initialPoll?.allow_vote_change ?? false,
   results_public: props.initialPoll?.results_public ?? false,
-  duration: props.initialPoll?.duration ? Math.round(props.initialPoll.duration / 60) : '',
+  duration: props.initialPoll?.duration ? Math.round(props.initialPoll.duration / 86400) : '',
 });
 
 const options = ref(
@@ -41,7 +45,8 @@ async function submit() {
   const payload = {
     ...form,
     options: options.value.filter(o => o.trim() !== ''),
-    duration: form.duration ? parseInt(form.duration) * 60 : null,
+    duration: form.duration ? form.duration * 86400 : null,
+
   };
 
   try {
@@ -128,20 +133,21 @@ async function submit() {
         </label>
         <label class="flex items-center gap-2">
           <input type="checkbox" v-model="form.is_draft" />
-          Brouillon (coché = brouillon, décoché = actif)
+          Brouillon (Le sondage ne sera pas actif tant que cette case est cochée)
         </label>
       </div>
 
-      <div v-if="!form.is_draft">
-        <label class="block text-sm font-medium mb-1">Durée (minutes, optionnel)</label>
+      <div>
+        <label class="block text-sm font-medium mb-1">Durée (jours, optionnel)</label>
         <input v-model="form.duration" type="number" min="0"
+          :disabled="form.is_draft"
           class="w-full border rounded px-3 py-2" />
         <p v-if="fieldErrors.duration" class="text-red-600 text-sm mt-1">
           {{ fieldErrors.duration[0] }}
         </p>
-      </div>
-      <div v-else class="text-sm text-gray-500">
-        La durée ne s’applique que si le sondage est actif.
+        <p class="text-sm text-gray-500 mt-1">
+          {{ form.is_draft ? 'La durée est enregistrée mais sera appliquée seulement lorsque le sondage sera actif.' : 'Le sondage est actif, la durée sera utilisée.' }}
+        </p>
       </div>
 
       <button type="submit"

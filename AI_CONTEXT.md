@@ -127,8 +127,11 @@
 
 - `resources/js/components/PollForm.vue`
   - Formulaire dynamique de création/édition de sondage.
+  - **Création** : sondage actif par défaut (`is_draft = false`).
+  - **Durée** : affichée en jours (conversion ×86400 secondes). Désactivée si brouillon, activée si actif.
   - Gère les options dynamiques (ajout/suppression) et les paramètres `is_draft`, `allow_multiple_choices`, `allow_vote_change`, `results_public`, `duration`.
-  - Utilise `useFetchApi('/api/v1')` pour POST/PUT.
+  - Message clair : « La durée ne s'applique que si le sondage est actif ».
+  - Utilise `useFetchApi('/api/v1')` pour POST/PUT avec `credentials: 'same-origin'` (Sanctum cookies).
 
 - `resources/js/components/PollTable.vue`
   - Affiche un tableau de sondages.
@@ -147,6 +150,8 @@
 ### Composables détectés
 
 - `resources/js/composables/useFetchApi.js` — gestion HTTP `fetch` avec base URL `/api/v1`, timeout, parsing JSON, erreurs.
+  - **Correction Sanctum** : `credentials: 'same-origin'` ajouté pour que cookies de session/XSRF soient envoyés.
+  - **Correction Sanctum** : `credentials: 'same-origin'` ajouté pour que cookies de session/XSRF soient envoyés.
 - `resources/js/composables/useFetchJson.js` — wrapper `fetch` plus simple.
 - `resources/js/composables/useHashRoute.js` — routeur hash navigateur custom, mais il n’est pas clairement utilisé dans le code chargé.
 - `resources/js/composables/useJsonStorage.js` — sauvegarde de données réactives dans `localStorage`.
@@ -252,4 +257,74 @@
 
 ---
 
-> Ce fichier est fondé uniquement sur le code présent dans le dépôt et sur les fichiers accessibles. Toute information dépendante de `.env` ou d’un déploiement réel n’a pas pu être confirmée.
+## 9. Correctifs implémentés pour étape 3 → étape 4
+
+### Problème : Sondage figé en brouillon et durée non fonctionnelle
+
+**Symptômes** :
+- Sondages toujours créés en brouillon, impossible de les rendre actifs.
+- Durée impossible à saisir sans cocher/décocher le brouillon.
+- Sondages affichés comme "terminés" alors qu'ils venaient d'être créés.
+
+**Correctifs appliqués** :
+
+#### Backend (`app/Http/Controllers/Api/v1/ApiPollController.php`)
+
+1. **`store()`** :
+   - Accepte désormais `is_draft` depuis le frontend (ajout validation).
+   - Ne force plus `true` ; utilise la valeur envoyée (défaut `false`).
+   - Si sondage actif + durée définie → `started_at` et `ends_at` calculés immédiatement.
+
+2. **`update()`** :
+   - Détecte si durée a changé ou si sondage passe de brouillon à actif.
+   - Recalcule `ends_at = now() + duration` quand nécessaire.
+   - Évite les surécritures inutiles des dates.
+
+3. **`vote()`** :
+   - Correction : utilise `$poll->votes()->create([...])` (relation) au lieu de `PollVote::create(...)`.
+   - Garantit que `poll_id` est toujours renseigné, évite contrainte NOT NULL.
+
+#### Frontend (`resources/js/components/PollForm.vue`)
+
+1. **Initialisation** :
+   - Création : `is_draft = false` par défaut (sondage actif immédiatement).
+   - Édition : respecte l'état existant du sondage.
+
+2. **Durée** :
+   - Affichée en **jours** au lieu de minutes (UX plus claire, conversion ÷ 86400).
+   - Champ visible en permanence mais **désactivé si brouillon**.
+   - Message utilisateur : « La durée s'applique uniquement si le sondage est actif ».
+   - Conversion frontend → backend : jours × 86400 = secondes.
+
+3. **Case "Brouillon"** :
+   - Label clarifié : « Brouillon (coché = brouillon, décoché = actif) ».
+   - Toggle direct sans cocher/décocher paradoxal.
+
+#### HTTP (`resources/js/composables/useFetchApi.js`)
+
+1. **Sanctum auth** :
+   - Ajout `credentials: 'same-origin'` dans `fetch()`.
+   - Garantit que cookies de session/XSRF sont envoyés à chaque requête.
+
+### Résultat
+
+- ✅ Sondages créés **actifs** par défaut.
+- ✅ Durée **saisissable** dès la création.
+- ✅ Basculement brouillon ↔ actif **fonctionne** directement.
+- ✅ Vote fonctionne sans erreur NOT NULL.
+- ✅ Dates de fin **calculées correctement** et persistées.
+
+### Étape 4 — Prochaines étapes
+
+- [ ] Frontend : créer page `/vote/{token}` pour voter publiquement (authentifié).
+- [ ] Frontend : créer page résultats graphiques `/results/{token}`.
+- [ ] Frontend : afficher lien de partage dans dashboard (copie automatique).
+- [ ] Frontend : interface de vote (choix radio/checkbox selon `allow_multiple_choices`).
+- [ ] Frontend : affichage du statut sondage (actif/terminé/brouillon).
+- [ ] Tests : vérifier contrainte unique vote utilisateur + sondage.
+- [ ] Tests : intégration complète création → vote → résultats.
+
+---
+
+> Ce fichier est fondé uniquement sur le code présent dans le dépôt et sur les fichiers accessibles. Toute information dépendante de `.env` ou d'un déploiement réel n'a pas pu être confirmée.
+

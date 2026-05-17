@@ -113,6 +113,21 @@ Pour ne pas laisser des options orphelines en base si le sondage parent est supp
 - `shareLink()` séparée de `copyLink()` : séparation des responsabilités, `shareLink` peut être réutilisée ailleurs (ex: page de vote)
 - `setTimeout` pour réinitialiser `copiedId` : non-bloquant, ne gèle pas le thread JS
 
+## Étape 3 — Création / Édition / Suppression sondage + options
+
+### Ce qui a été fait
+- `PollForm.vue` : formulaire unifié create/edit avec options dynamiques (ajout/suppression, minimum 2)
+- Initialisation brouillon à `true` par défaut à la création
+- Affichage des erreurs de validation Laravel (422) par champ via `fieldErrors`
+- Durée désactivée si sondage en brouillon (UI uniquement, la valeur est quand même sauvegardée)
+- Redirection vers dashboard après succès
+- `AppPollCreate.vue` / `AppPollEdit.vue` : points de montage distincts alimentés par Blade via `data-props`
+
+### Pourquoi ces choix
+- **`reactive()` pour le form** : les champs sont liés entre eux, plus naturel qu'un `ref` par champ
+- **`fieldErrors` séparé de `error`** : distinction entre erreur globale et erreurs par champ, plus propre à l'affichage
+- **Pas de Pinia** : le formulaire est local à la page, pas besoin de store global
+- **Brouillon par défaut** : règle métier confirmée — un sondage ne doit jamais être actif sans action explicite du créateur
 
 ## Consignes générales
 
