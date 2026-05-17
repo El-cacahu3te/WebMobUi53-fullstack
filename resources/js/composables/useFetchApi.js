@@ -166,5 +166,33 @@ export function useFetchApi(baseUrl = null, additionalHeaders = {}) {
     return { data, error, loading, fetchNow };
   }
 
-  return { fetchApi, fetchApiToRef };
+  function get(options) {
+    if (typeof options === 'string') {
+      return fetchApi({ url: options, method: 'GET' });
+    }
+    return fetchApi({ ...options, method: 'GET' });
+  }
+
+  function post(options) {
+    if (typeof options === 'string') {
+      throw new Error('post() requires an object with url and data when using a body.');
+    }
+    return fetchApi({ ...options, method: 'POST' });
+  }
+
+  function put(options) {
+    if (typeof options === 'string') {
+      throw new Error('put() requires an object with url and data.');
+    }
+    return fetchApi({ ...options, method: 'PUT' });
+  }
+
+  function del(options) {
+    if (typeof options === 'string') {
+      return fetchApi({ url: options, method: 'DELETE' });
+    }
+    return fetchApi({ ...options, method: 'DELETE' });
+  }
+
+  return { fetchApi, fetchApiToRef, get, post, put, del };
 }

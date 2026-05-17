@@ -19,26 +19,35 @@ const statusLabels = {
 
 // Construit le lien de partage à partir du token
 function shareLink(token) {
-    return `${window.location.origin}/vote/${token}`;
+    return `${window.location.origin}/polls/${token}/vote`;
 }
+
 // Stocke l'id du sondage dont le lien vient d'être copié
 const copiedId = ref(null);
 
 function copyLink(url, pollId) {
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(url);
-  } else {
-    const input = document.createElement('input');
-    input.value = url;
-    document.body.appendChild(input);
-    input.select();
-    document.execCommand('copy');
-    document.body.removeChild(input);
-  }
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(url);
+    } else {
+        const input = document.createElement('input');
+        input.value = url;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+    }
 
-  // Affiche "Copié !" pendant 2 secondes pour ce sondage précis
-  copiedId.value = pollId;
-  setTimeout(() => { copiedId.value = null; }, 2000);
+    // Affiche "Copié !" pendant 2 secondes pour ce sondage précis
+    copiedId.value = pollId;
+    setTimeout(() => { copiedId.value = null; }, 2000);
+}
+
+function goToResults(token) {
+    window.location.href = `/polls/${token}/results`;
+}
+
+function goToVote(token) {
+    window.location.href = `/polls/${token}/vote`;
 }
 
 async function delPoll(id) {
@@ -102,20 +111,30 @@ async function delPoll(id) {
               </code>
                             <!-- Copie dans le presse-papier -->
                             <button @click="copyLink(shareLink(poll.secret_token), poll.id)"
-  class="text-xs px-2 py-1 rounded transition-colors"
-  :class="copiedId === poll.id
-    ? 'bg-green-100 text-green-700'
-    : 'text-blue-600 hover:underline'"
->
-  {{ copiedId === poll.id ? '✓ Copié !' : 'Copier' }}
+                                class="text-xs px-2 py-1 rounded transition-colors" :class="copiedId === poll.id
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'text-blue-600 hover:underline'">
+                                {{ copiedId === poll.id ? '✓ Copié !' : 'Copier' }}
                             </button>
 
                         </div>
                     </td>
-
                     <!-- Actions -->
                     <td class="border px-3 py-2">
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 flex-wrap">
+                            <!-- Voter : seulement si actif -->
+                            <button v-if="getPollStatus(poll) === 'active'" @click="goToVote(poll.secret_token)"
+                                class="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600">
+                                Voter
+                            </button>
+
+                            <!-- Résultats : seulement si non brouillon -->
+                            <a v-if="!poll.is_draft" :href="`/polls/${poll.secret_token}/results`"
+                                class="text-xs bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600">
+                                Résultats
+                            </a>
+
+                            <!-- Éditer et Supprimer : inchangés -->
                             <a :href="`/polls/${poll.id}/edit`"
                                 class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
                                 Éditer
@@ -126,7 +145,6 @@ async function delPoll(id) {
                             </button>
                         </div>
                     </td>
-
                 </tr>
             </tbody>
         </table>

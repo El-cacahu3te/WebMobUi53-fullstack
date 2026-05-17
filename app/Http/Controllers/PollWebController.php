@@ -3,6 +3,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Poll;
 use Illuminate\Http\Request;
 
 class PollWebController extends Controller
@@ -19,5 +20,31 @@ class PollWebController extends Controller
         $poll = $request->user()->polls()->with('options')->findOrFail($id);
 
         return view('polls.edit', ['poll' => $poll]);
+    }
+
+    // Page de vote — affiche le formulaire de vote
+    public function vote($token)
+    {
+        $poll = Poll::where('secret_token', $token)->firstOrFail();
+
+        // Vérifier que le sondage n'est pas brouillon
+        if ($poll->is_draft) {
+            abort(403, 'Ce sondage n\'est pas encore lancé.');
+        }
+
+        return view('polls.vote', ['token' => $token]);
+    }
+
+    // Page de résultats — affiche les résultats
+    public function results($token)
+    {
+        $poll = Poll::where('secret_token', $token)->firstOrFail();
+
+        // Si résultats privés, vérifier que c'est le créateur
+        if (!$poll->results_public && $poll->user_id !== auth()->id()) {
+            abort(403, 'Les résultats ne sont pas publics.');
+        }
+
+        return view('polls.results', ['token' => $token]);
     }
 }

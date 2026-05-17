@@ -41,4 +41,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/polls/create', [PollWebController::class, 'create'])->name('polls.create');
     Route::get('/polls/{id}/edit', [PollWebController::class, 'edit'])->name('polls.edit');
+    Route::get('/polls/{token}/vote', [PollWebController::class, 'vote'])->name('polls.vote');
+    Route::get('/polls/{token}/results', [PollWebController::class, 'results'])->name('polls.results');
 });

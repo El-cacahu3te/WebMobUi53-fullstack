@@ -12,6 +12,8 @@ export default defineConfig({
                 'resources/js/poll-dashboard.js',
                 'resources/js/poll-edit.js',
                 'resources/js/poll-create.js',
+                'resources/js/poll-vote.js',
+                'resources/js/poll-results.js',
             ],
             refresh: true,
         }),
