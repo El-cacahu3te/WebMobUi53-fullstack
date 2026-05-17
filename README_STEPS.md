@@ -285,6 +285,27 @@ Pour ne pas laisser des options orphelines en base si le sondage parent est supp
 - **Arrêt du polling si expiré** : inutile de poller un sondage terminé, ça économise des requêtes sans complexité supplémentaire.
 - **`onUnmounted` + `clearInterval`** : bonne pratique Vue — sans ça, l'intervalle continue même si le composant est détruit.
 
+## Étape 7 — Polling + Graphique des résultats
+
+### Ce qui a été fait
+
+- `usePolling.js` : ajout du paramètre `immediate` (appel direct au mount, évite d'attendre le premier tick de 5s avant d'afficher les données)
+- `AppPollResults.vue` : refactorisé pour utiliser `usePolling` au lieu d'un `setInterval` manuel dans `onMounted` + `clearInterval` dans `onUnmounted`
+- Graphique en barres CSS Tailwind avec pourcentages calculés côté frontend
+- Indicateur visuel "En direct" (point vert `animate-pulse`) pendant le polling
+- Arrêt automatique du polling si sondage expiré ou résultats privés (403)
+
+### Pourquoi ces choix techniques
+
+- **`usePolling` composable** : séparation des responsabilités. Le composant sait _quoi_ faire (`fetchResults`), le composable sait _quand_ le faire (intervalle + cycle de vie). Réutilisable ailleurs sans duplication.
+- **`immediate = true`** : sans ça, l'utilisateur attend 5s avant le premier affichage. Avec, `fetchResults` part dès le mount ET toutes les 5s ensuite.
+- **Barres CSS Tailwind** : zéro dépendance externe (pas de Chart.js), animation fluide via `transition-all duration-700`, suffisant pour le besoin.
+- **Arrêt du polling** : inutile de bombarder l'API si les données ne peuvent plus changer (expiré) ou si on n'y a pas accès (403).
+
+### Fichiers modifiés
+
+- `resources/js/composables/usePolling.js`
+- `resources/js/AppPollResults.vue`
 
 ## Consignes générales
 
