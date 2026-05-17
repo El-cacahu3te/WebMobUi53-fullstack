@@ -95,6 +95,25 @@ Pour ne pas laisser des options orphelines en base si le sondage parent est supp
   - Si `allow_multiple_choices` = true → on accepte plusieurs `poll_option_id`
   - Sinon → on refuse le double vote
 
+
+  ## Étape 2 — Dashboard (liste des sondages)
+
+### Ce qui a été fait
+- Enrichissement de `PollTable.vue` : affichage du titre, question tronquée, badge de statut, date de fin, lien de partage, boutons Éditer / Supprimer
+- Enrichissement de `AppPollDashboard.vue` : en-tête avec bouton "Nouveau sondage"
+- Badge de statut calculé côté client (Brouillon / Actif / Terminé) via `getPollStatus()`
+- Lien de partage affiché uniquement si le sondage est lancé (pas brouillon)
+- Bouton "Copier" avec feedback visuel "✓ Copié !" pendant 2 secondes
+- `copiedId` (ref) pour cibler uniquement le bouton de la ligne copiée
+- Fallback `execCommand('copy')` si `navigator.clipboard` indisponible (HTTP / vieux navigateurs)
+
+### Pourquoi ces choix
+- `ref(null)` pour `copiedId` plutôt qu'un booléen : permet de gérer N lignes indépendamment
+- Statut calculé côté client : évite un champ redondant en DB, les données nécessaires (`is_draft`, `ends_at`) sont déjà présentes
+- `shareLink()` séparée de `copyLink()` : séparation des responsabilités, `shareLink` peut être réutilisée ailleurs (ex: page de vote)
+- `setTimeout` pour réinitialiser `copiedId` : non-bloquant, ne gèle pas le thread JS
+
+
 ## Consignes générales
 
 Vous développerez une application web en deux parties :

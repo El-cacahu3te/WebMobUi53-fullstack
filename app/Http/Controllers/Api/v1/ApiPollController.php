@@ -45,6 +45,7 @@ class ApiPollController extends Controller
             'allow_vote_change'     => 'boolean',
             'results_public'        => 'boolean',
             'duration'              => 'nullable|integer',
+            'is_draft'              => 'boolean',
             'options'               => 'required|array|min:2',
             'options.*'             => 'required|string|max:255',
         ]);
@@ -52,6 +53,7 @@ class ApiPollController extends Controller
         // Génère un token unique pour le lien de partage
         $token = bin2hex(random_bytes(16));
 
+        $isDraft = $validated['is_draft'] ?? false;
         $poll = Poll::create([
             'user_id'               => $request->user()->id,
             'question'              => $validated['question'],
@@ -61,7 +63,9 @@ class ApiPollController extends Controller
             'allow_vote_change'     => $validated['allow_vote_change'] ?? false,
             'results_public'        => $validated['results_public'] ?? false,
             'duration'              => $validated['duration'] ?? null,
-            'is_draft'              => true, // toujours brouillon à la création
+            'is_draft'              => $isDraft,
+            'started_at'            => $isDraft ? null : now(),
+            'ends_at'               => !$isDraft && $validated['duration'] ? now()->addSeconds($validated['duration']) : null,
         ]);
 
         // Crée chaque option liée au sondage
@@ -93,6 +97,8 @@ class ApiPollController extends Controller
         'options.*'              => 'required|string|max:255',
     ]);
 
+
+    $wasDraft = $poll->is_draft;
     $poll->update($validated);
 
     // Si on envoie de nouvelles options, on remplace tout
@@ -103,10 +109,12 @@ class ApiPollController extends Controller
         }
     }
 
-    //calcul fin si la durée et donée une fois que ce n'est plus un draft
-    if (isset($validated['is_draft']) && $validated['is_draft'] === false && $poll->duration) {
-        $poll->ends_at = now()->addSeconds($poll->duration);
-        $poll->started_at = now();
+    // Si on bascule d'un brouillon vers publié, met à jour les dates de début/fin
+    if (isset($validated['is_draft']) && $validated['is_draft'] === false && $wasDraft) {
+        $poll->started_at = $poll->started_at ?? now();
+        if ($poll->duration) {
+            $poll->ends_at = now()->addSeconds($poll->duration);
+        }
         $poll->save();
     }
 
@@ -153,11 +161,10 @@ public function vote(Request $request, string $token)
             ->delete();
     }
 
-    // Crée un vote par option sélectionnée
+    // Crée un vote par option sélectionnée en utilisant la relation de sondage
     foreach ($validated['option_ids'] as $optionId) {
-        PollVote::create([
+        $poll->votes()->create([
             'user_id'        => $user->id,
-            'poll_id'        => $poll->id,
             'poll_option_id' => $optionId,
         ]);
     }

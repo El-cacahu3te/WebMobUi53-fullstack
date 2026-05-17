@@ -100,7 +100,8 @@
 
 - Pas de validation de droits plus fine côté API pour le propriétaire au-delà de `user_id` sur `update`/`remove`.
 - Pas de endpoints explicites pour gestion des options séparément : les options sont gérées dans `options` comme tableau à `store`/`update`.
-- Pas de scaffold côté API pour créer/éditer un sondage avec champ `is_draft` en tant que page frontend.
+- Les endpoints API de création/édition sont en place et le frontend dispose désormais de pages `polls.create` et `polls.edit` avec `PollForm.vue`.
+- Pas de page de vote publique côté frontend ni de résultats graphiques visibles.
 - Pas de contrainte DB unique sur vote utilisateur + sondage / option pour garantir unique à 100% au niveau DB.
 
 ### Pattern de réponse API
@@ -117,6 +118,17 @@
 - `resources/js/AppPollDashboard.vue`
   - Charge les props `polls`, `loginUrl`, `username` depuis un `div` blade.
   - Monte `PollTable`.
+
+- `resources/js/AppPollCreate.vue`
+  - Monte `PollForm` en mode `create`.
+
+- `resources/js/AppPollEdit.vue`
+  - Monte `PollForm` en mode `edit` avec `initialPoll` injecté depuis Blade.
+
+- `resources/js/components/PollForm.vue`
+  - Formulaire dynamique de création/édition de sondage.
+  - Gère les options dynamiques (ajout/suppression) et les paramètres `is_draft`, `allow_multiple_choices`, `allow_vote_change`, `results_public`, `duration`.
+  - Utilise `useFetchApi('/api/v1')` pour POST/PUT.
 
 - `resources/js/components/PollTable.vue`
   - Affiche un tableau de sondages.
@@ -143,14 +155,17 @@
 ### Vue Router / architecture SPA
 
 - Aucune configuration explicite de Vue Router.
-- L’application est montée uniquement dans `resources/views/polls/dashboard.blade.php` via Vite et Blade.
+- L’application est montée dans plusieurs pages Blade distinctes : `polls.dashboard`, `polls.create`, `polls.edit`.
+- Chaque page Vue a son propre point de montage (`poll-dashboard.js`, `poll-create.js`, `poll-edit.js`).
 - La navigation est majoritairement gérée par routes Laravel côté serveur.
 
 ### Points frontend notables
 
 - `resources/js/poll-dashboard.js` monte l’app Vue et passe les données initiales via `data-props` dans Blade.
+- `resources/js/poll-create.js` et `resources/js/poll-edit.js` existent pour les pages de création et d’édition de sondage.
+- `resources/js/components/PollForm.vue` est le composant central pour la création/édition.
 - Il y a un package `usePolling.js`, mais aucun composant de polling automatique visible dans le code de sondage actuel.
-- `resources/css/app.css` est importé dans Vite ; Tailwind est disponible mais l’UI de sondage actuelle utilise peu de classes Tailwind et repose sur un tableau HTML simple.
+- `resources/css/app.css` est importé dans Vite ; Tailwind est disponible mais l’UI de sondage actuelle utilise surtout des classes utilitaires simples.
 
 ## 6. Décisions implicites détectées
 
@@ -171,15 +186,15 @@
 
 2. CRUD complet d'un sondage :
    - Backend existe pour create/update/delete.
-   - Frontend manque les pages/formulaires de création et modification.
+   - Frontend dispose maintenant de pages de création (`polls.create`) et d’édition (`polls.edit`) avec `PollForm.vue`.
 
 3. Gestion des options :
    - Backend gère les options par `options[]` en payload.
-   - Frontend n’a pas d’interface d’ajout/modification/suppression d’options.
+   - Frontend dispose à présent d’une interface d’ajout/suppression d’options.
 
 4. Paramètres avancés :
    - Champs backend présents (`is_draft`, `allow_multiple_choices`, `allow_vote_change`, `results_public`, `duration`, `ends_at`).
-   - Pas d’UI de configuration de ces paramètres.
+   - L’UI de création/édition expose ces paramètres.
 
 5. Lien de partage via token :
    - Backend génère `secret_token` et endpoints publics existent pour consultation.

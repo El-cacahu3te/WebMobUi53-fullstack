@@ -5,6 +5,7 @@ use App\Http\Controllers\LikeController;
 use App\Http\Controllers\MyProfileController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PollDashboardController;
+use App\Http\Controllers\PollWebController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\TokenController;
 use App\Models\Post;
@@ -38,4 +39,6 @@ Route::middleware('auth')->group(function () {
     Route::match(['put', 'patch'], '/likes/{post}', [LikeController::class, 'update']);
     Route::resource('tokens', TokenController::class)->only(['index', 'create', 'store', 'destroy']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/polls/create', [PollWebController::class, 'create'])->name('polls.create');
+    Route::get('/polls/{id}/edit', [PollWebController::class, 'edit'])->name('polls.edit');
 });

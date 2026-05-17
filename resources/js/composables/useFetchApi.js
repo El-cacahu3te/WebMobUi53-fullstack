@@ -1,9 +1,17 @@
 import { ref, shallowRef } from "vue";
 
+// Fonction helper — lit le cookie XSRF-TOKEN posé par Laravel
+function getCsrfToken() {
+    const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
 const defaultHeaders = {
-  'Content-Type': 'application/json',
-  'X-Requested-With': 'XmlHttpRequest',
-  'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'X-Requested-With': 'XmlHttpRequest',
+    'Accept': 'application/json',
+    // Ajout : Laravel vérifie ce header sur POST/PUT/DELETE
+    'X-XSRF-TOKEN': getCsrfToken(),
 };
 
 let defaultBaseUrl = '';
@@ -66,6 +74,7 @@ export function useFetchApi(baseUrl = null, additionalHeaders = {}) {
         method,
         headers: allHeaders,
         body: data != null ? JSON.stringify(data) : null,
+        credentials: 'same-origin',
         signal: controller.signal,
       })
       .then(response => {
