@@ -1,178 +1,153 @@
 <script setup>
-import { ref, onMounted, computed } from "vue";
-import { useFetchApi } from "./composables/useFetchApi";
+import { ref, onMounted, computed } from 'vue'
+import { useFetchApi } from './composables/useFetchApi'
+import AlertMessage from './components/AlertMessage.vue'
 
-const props = defineProps({ token: String });
+const props = defineProps({ token: String })
+const { get, post } = useFetchApi('/api/v1')
 
-const { get, post } = useFetchApi("/api/v1");
-
-const poll = ref(null);
-const selectedOptions = ref([]);
-const loading = ref(true);
-const voting = ref(false);
-const message = ref("");
-const messageType = ref("");
+const poll            = ref(null)
+const selectedOptions = ref([])
+const loading         = ref(true)
+const voting          = ref(false)
+const alertMsg        = ref('')
+const alertType       = ref('error')
 
 onMounted(async () => {
-    try {
-        poll.value = await get(`/polls/${props.token}`);
-    } catch {
-        message.value = "Impossible de charger le sondage.";
-        messageType.value = "error";
-    } finally {
-        loading.value = false;
-    }
-});
+  try {
+    poll.value = await get(`/polls/${props.token}`)
+  } catch {
+    alertMsg.value  = 'Impossible de charger le sondage.'
+    alertType.value = 'error'
+  } finally {
+    loading.value = false
+  }
+})
 
-// Sondage terminé si ends_at est dépassé
 const isExpired = computed(() => {
-    if (!poll.value?.ends_at) return false;
-    return new Date(poll.value.ends_at) < new Date();
-});
+  if (!poll.value?.ends_at) return false
+  return new Date(poll.value.ends_at) < new Date()
+})
 
 function toggleOption(optionId) {
-    if (poll.value.allow_multiple_choices) {
-        // Checkbox : toggle dans le tableau
-        const idx = selectedOptions.value.indexOf(optionId);
-        if (idx === -1) selectedOptions.value.push(optionId);
-        else selectedOptions.value.splice(idx, 1);
-    } else {
-        // Radio : un seul choix
-        selectedOptions.value = [optionId];
-    }
+  if (poll.value.allow_multiple_choices) {
+    const idx = selectedOptions.value.indexOf(optionId)
+    if (idx === -1) selectedOptions.value.push(optionId)
+    else selectedOptions.value.splice(idx, 1)
+  } else {
+    selectedOptions.value = [optionId]
+  }
 }
 
 async function submitVote() {
-    if (selectedOptions.value.length === 0) {
-        message.value = "Veuillez sélectionner au moins une option.";
-        messageType.value = "error";
-        return;
+  if (selectedOptions.value.length === 0) {
+    alertMsg.value  = 'Veuillez sélectionner au moins une option.'
+    alertType.value = 'warning'
+    return
+  }
+  voting.value   = true
+  alertMsg.value = ''
+
+  try {
+    await post({ url: `/polls/${props.token}/vote`, data: { option_ids: selectedOptions.value } })
+    alertMsg.value  = '✓ Vote enregistré ! Redirection vers les résultats...'
+    alertType.value = 'success'
+    setTimeout(() => { window.location.href = `/polls/${props.token}/results` }, 2000)
+  } catch (err) {
+    const msg = err?.data?.message ?? ''
+    // Mapping des messages API vers messages FR
+    if (msg.toLowerCase().includes('already voted') || msg.toLowerCase().includes('déjà voté')) {
+      alertMsg.value = 'Vous avez déjà voté pour ce sondage.'
+    } else if (msg.toLowerCase().includes('closed') || msg.toLowerCase().includes('terminé')) {
+      alertMsg.value = 'Ce sondage est terminé.'
+    } else if (msg.toLowerCase().includes('draft') || msg.toLowerCase().includes('not available')) {
+      alertMsg.value = "Ce sondage n'est pas encore lancé."
+    } else {
+      alertMsg.value = msg || 'Erreur lors du vote. Veuillez réessayer.'
     }
-
-    voting.value = true;
-    message.value = "";
-
-    try {
-        await post({
-            url: `/polls/${props.token}/vote`,
-            data: {
-                option_ids: selectedOptions.value,
-            },
-        });
-        message.value = "✓ Vote enregistré ! Redirection vers les résultats...";
-        messageType.value = "success";
-        // Redirection vers résultats après 2s
-        setTimeout(() => {
-            window.location.href = `/polls/${props.token}/results`;
-        }, 2000);
-    } catch (err) {
-        const apiMessage = err?.data?.message || err?.statusText || "";
-
-        // Déjà voté (API retourne actuellement "Already voted." en anglais)
-        if (
-            apiMessage === "Already voted." ||
-            apiMessage.toLowerCase().includes("already voted") ||
-            apiMessage.toLowerCase().includes("déjà voté")
-        ) {
-            message.value = "Vous avez déjà voté pour ce sondage.";
-        } else if (
-            apiMessage.toLowerCase().includes("closed") ||
-            apiMessage.toLowerCase().includes("terminé")
-        ) {
-            message.value = "Ce sondage est terminé.";
-        } else if (
-            apiMessage.toLowerCase().includes("draft") ||
-            apiMessage.toLowerCase().includes("brouillon") ||
-            apiMessage.toLowerCase().includes("not available") ||
-            apiMessage.toLowerCase().includes("poll has")
-        ) {
-            message.value = "Ce sondage n'est pas encore lancé.";
-        } else {
-            message.value =
-                apiMessage || "Erreur lors du vote. Veuillez réessayer.";
-        }
-        messageType.value = "error";
-    }
+    alertType.value = 'error'
+  } finally {
+    voting.value = false
+  }
 }
 </script>
+
 <template>
-    <div class="max-w-xl mx-auto mt-8 px-4">
-        <!-- Chargement -->
-        <div v-if="loading" class="text-center text-gray-500 py-12">
-            Chargement du sondage...
-        </div>
+  <div class="max-w-lg mx-auto px-4 py-8">
 
-        <div v-else-if="poll" class="bg-white rounded-lg shadow p-6">
-            <h1 class="text-2xl font-bold mb-2">{{ poll.title }}</h1>
-            <p class="text-gray-600 mb-6">{{ poll.question }}</p>
-
-            <!-- NOUVEAU : sondage brouillon -->
-            <div v-if="poll.is_draft" class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded p-4 mb-4">
-                Ce sondage n'est pas encore lancé.
-            </div>
-
-            <!-- Sondage terminé -->
-            <div v-else-if="isExpired" class="bg-red-50 border border-red-200 text-red-700 rounded p-4 mb-4">
-                Ce sondage est terminé. Vous ne pouvez plus voter.
-                <a :href="`/polls/${props.token}/results`" class="block mt-2 text-red-700 underline font-medium">
-                    Voir les résultats →
-                </a>
-            </div>
-            <!-- Formulaire de vote -->
-            <div v-else class="space-y-3">
-                <p class="text-sm text-gray-500 mb-3">
-                    {{
-                        poll.allow_multiple_choices
-                            ? "Plusieurs choix possibles"
-                            : "Un seul choix possible"
-                    }}
-                </p>
-
-                <div v-for="option in poll.options" :key="option.id" @click="toggleOption(option.id)"
-                    class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition"
-                    :class="selectedOptions.includes(option.id)
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200'
-                        ">
-                    <!-- Radio ou Checkbox selon le type -->
-                    <input :type="poll.allow_multiple_choices ? 'checkbox' : 'radio'
-                        " :checked="selectedOptions.includes(option.id)" class="accent-blue-600" readonly />
-                    <span>{{ option.label }}</span>
-                </div>
-
-                <!-- Bouton voter -->
-                <button @click="submitVote" :disabled="voting || selectedOptions.length === 0"
-                    class="w-full mt-4 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
-                    {{ voting ? "Envoi..." : "Voter" }}
-                </button>
-                <!-- Navigation -->
-                <div class="mt-6 flex gap-3">
-                    <!-- Retour dashboard -->
-                    <a href="/polls/dashboard"
-                        class="flex-1 text-center bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600 transition text-sm">
-                        Dashboard
-                    </a>
-
-                    <!-- Résultats -->
-                    <a v-if="!poll.is_draft" :href="`/polls/${props.token}/results`"
-                        class="flex-1 text-center bg-purple-500 text-white py-2 rounded-lg hover:bg-purple-600 transition text-sm">
-                        Voir les résultats →
-                    </a>
-                </div>
-            </div>
-
-            <!-- Message feedback -->
-            <div v-if="message" class="mt-4 p-3 rounded text-sm" :class="messageType === 'success'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
-                ">
-                {{ message }}
-            </div>
-        </div>
-
-        <!-- Erreur chargement -->
-        <div v-else class="bg-red-50 text-red-700 rounded p-4">
-            {{ message || "Sondage introuvable." }}
-        </div>
+    <!-- Chargement -->
+    <div v-if="loading" class="flex flex-col items-center py-16 text-gray-400 gap-3">
+      <span class="text-3xl animate-spin">⟳</span>
+      <p>Chargement du sondage...</p>
     </div>
+
+    <div v-else-if="poll" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+
+      <!-- En-tête -->
+      <div>
+        <h1 class="text-xl font-bold text-gray-800">{{ poll.title }}</h1>
+        <p class="text-gray-500 mt-1">{{ poll.question }}</p>
+      </div>
+
+      <!-- États bloquants -->
+      <AlertMessage v-if="poll.is_draft" type="info" message="Ce sondage n'est pas encore lancé." />
+      <AlertMessage v-else-if="isExpired" type="error" message="Ce sondage est terminé. Vous ne pouvez plus voter." />
+
+      <!-- Formulaire de vote -->
+      <template v-else>
+        <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">
+          {{ poll.allow_multiple_choices ? 'Plusieurs choix possibles' : 'Un seul choix' }}
+        </p>
+
+        <div class="space-y-2">
+          <div
+            v-for="option in poll.options"
+            :key="option.id"
+            @click="toggleOption(option.id)"
+            :class="[
+              'flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition',
+              selectedOptions.includes(option.id)
+                ? 'border-green-500 bg-green-50'
+                : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+            ]"
+          >
+            <input
+              :type="poll.allow_multiple_choices ? 'checkbox' : 'radio'"
+              :checked="selectedOptions.includes(option.id)"
+              class="accent-green-600 shrink-0"
+              readonly
+            />
+            <span class="text-sm font-medium text-gray-700">{{ option.label }}</span>
+          </div>
+        </div>
+
+        <button
+          @click="submitVote"
+          :disabled="voting || selectedOptions.length === 0"
+          class="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2"
+        >
+          <span v-if="voting" class="animate-spin">⟳</span>
+          {{ voting ? 'Envoi...' : 'Voter' }}
+        </button>
+      </template>
+
+      <!-- Feedback -->
+      <AlertMessage :type="alertType" :message="alertMsg" />
+
+      <!-- Navigation -->
+      <div class="flex gap-3 pt-2 border-t border-gray-50">
+        <a href="/polls/dashboard"
+          class="flex-1 text-center text-sm font-medium text-gray-500 hover:text-gray-700 py-2 rounded-xl hover:bg-gray-50 transition">
+          ← Dashboard
+        </a>
+        <a v-if="!poll.is_draft" :href="`/polls/${props.token}/results`"
+          class="flex-1 text-center text-sm font-medium text-green-600 hover:text-green-700 py-2 rounded-xl hover:bg-green-50 transition">
+          Voir les résultats →
+        </a>
+      </div>
+    </div>
+
+    <!-- Erreur chargement -->
+    <AlertMessage v-else :type="alertType" :message="alertMsg || 'Sondage introuvable.'" />
+  </div>
 </template>

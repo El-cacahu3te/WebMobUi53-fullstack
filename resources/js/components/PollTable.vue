@@ -45,7 +45,7 @@ async function delPoll(id) {
   <div v-if="polls.length === 0" class="text-center py-16 text-gray-400">
     <p class="text-4xl mb-3">📊</p>
     <p class="text-lg font-medium text-gray-600">Aucun sondage pour l'instant</p>
-    <a href="/polls/create" class="mt-4 inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
+    <a href="/polls/create" class="mt-4 inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-xl transition shadow-sm">
       Créer mon premier sondage
     </a>
   </div>
@@ -79,7 +79,7 @@ async function delPoll(id) {
           <code class="text-xs text-gray-600 truncate flex-1">{{ shareLink(poll.secret_token) }}</code>
           <button
             @click="copyLink(shareLink(poll.secret_token), poll.id)"
-            :class="['text-xs font-medium px-2 py-1 rounded-lg transition', copiedId === poll.id ? 'bg-green-100 text-green-700' : 'text-green-600 hover:bg-green-50']"
+            :class="['text-xs font-medium px-2 py-1 rounded-xl transition border', copiedId === poll.id ? 'bg-green-50 text-green-800 border-green-100' : 'bg-white text-green-700 border-green-100 hover:bg-green-50']"
           >
             {{ copiedId === poll.id ? '✓ Copié' : 'Copier' }}
           </button>
@@ -89,13 +89,13 @@ async function delPoll(id) {
         <!-- Actions -->
         <div class="flex flex-wrap gap-2 pt-1">
           <a v-if="getPollStatus(poll) === 'active'" :href="`/polls/${poll.secret_token}/vote`"
-            class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg transition">Voter</a>
+            class="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-xl transition shadow-sm">Voter</a>
           <a v-if="!poll.is_draft" :href="`/polls/${poll.secret_token}/results`"
-            class="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1.5 rounded-lg transition">Résultats</a>
+            class="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-xl transition border border-green-100">Résultats</a>
           <a :href="`/polls/${poll.id}/edit`"
-            class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition">Éditer</a>
+            class="text-xs bg-white hover:bg-green-50 text-green-700 px-3 py-1.5 rounded-xl transition border border-green-100">Éditer</a>
           <button @click="delPoll(poll.id)"
-            class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition">Supprimer</button>
+            class="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-xl transition border border-red-100">Supprimer</button>
         </div>
       </div>
     </div>
@@ -142,13 +142,13 @@ async function delPoll(id) {
             <td class="px-4 py-3">
               <div class="flex gap-1.5 flex-wrap">
                 <a v-if="getPollStatus(poll) === 'active'" :href="`/polls/${poll.secret_token}/vote`"
-                  class="text-xs bg-green-600 hover:bg-green-700 text-white px-2.5 py-1 rounded-lg transition">Voter</a>
+                  class="text-xs bg-green-600 hover:bg-green-700 text-white px-2.5 py-1 rounded-xl transition shadow-sm">Voter</a>
                 <a v-if="!poll.is_draft" :href="`/polls/${poll.secret_token}/results`"
-                  class="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2.5 py-1 rounded-lg transition">Résultats</a>
+                  class="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2.5 py-1 rounded-xl transition border border-green-100">Résultats</a>
                 <a :href="`/polls/${poll.id}/edit`"
-                  class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded-lg transition">Éditer</a>
+                  class="text-xs bg-white hover:bg-green-50 text-green-700 px-2.5 py-1 rounded-xl transition border border-green-100">Éditer</a>
                 <button @click="delPoll(poll.id)"
-                  class="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1 rounded-lg transition">Supprimer</button>
+                  class="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-2.5 py-1 rounded-xl transition border border-red-100">Supprimer</button>
               </div>
             </td>
           </tr>
