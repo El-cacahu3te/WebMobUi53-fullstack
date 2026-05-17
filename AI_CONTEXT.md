@@ -1,0 +1,240 @@
+# AI Context for WebMobUI Project
+
+## 1. Stack & configuration détectée
+
+- Backend: Laravel projet (`composer.json` avec `laravel/framework` `^12.0`, PHP `^8.2`).
+- Frontend: Vue 3 (`vue` `^3.5.18`, `@vitejs/plugin-vue`), Vite 7, Tailwind CSS 4 via `@tailwindcss/vite`.
+- API: Laravel Sanctum est activé (`laravel/sanctum` et `HasApiTokens` sur le modèle `User`).
+- Base de données: config `config/database.php` par défaut `sqlite`, mais les connexions MySQL, MariaDB et PostgreSQL sont présentes. Le fichier `.env` n’est pas fourni dans le dépôt, seulement `.env.example`.
+- Build: `package.json` expose `npm run dev` et `npm run build`. `composer.json` contient aussi `composer run dev` et `php artisan` commands.
+- CSS: `resources/css/app.css` importe Tailwind (`@import 'tailwindcss';`).
+
+## 2. Modèles & base de données
+
+### Modèles de sondage
+
+- `app/Models/Poll.php`
+  - Champs remplissables : `user_id`, `title`, `question`, `secret_token`, `is_draft`, `allow_multiple_choices`, `allow_vote_change`, `results_public`, `duration`, `started_at`, `ends_at`.
+  - Relations : `user()`, `options()`, `votes()`.
+
+- `app/Models/PollOption.php`
+  - Champs remplissables : `poll_id`, `label`.
+  - Relations : `poll()`, `votes()`.
+
+- `app/Models/PollVote.php`
+  - Champs remplissables : `poll_id`, `user_id`, `poll_option_id`.
+  - Relations : `poll()`, `user()`, `option()`.
+
+- `app/Models/User.php`
+  - Relations ajoutées : `polls()` et `pollVotes()`.
+  - Auth model standard avec `HasApiTokens`.
+
+### Migrations fournies
+
+- `database/migrations/2026_04_19_161823_create_polls_table.php`
+  - `polls` contient `secret_token` unique, booleans pour brouillon / choix multiple / changement de vote / résultats publics, durée en secondes, timestamps de début/fin.
+- `database/migrations/2026_04_19_161825_create_poll_options_table.php`
+  - `poll_options` lie une option à un sondage.
+- `database/migrations/2026_04_19_161826_create_poll_votes_table.php`
+  - `poll_votes` lie vote utilisateur à option et sondage.
+
+### Règles métier détectées
+
+- Sondage créé toujours comme `is_draft = true`.
+- `vote` autorisé seulement si sondage non brouillon et si `ends_at` n’est pas dépassé.
+- Pour un sondage simple, l’API bloque `option_ids` de longueur > 1.
+- Si `allow_vote_change` est faux, un second vote est refusé.
+- Si `allow_vote_change` est vrai, les anciens votes pour ce sondage sont supprimés et remplacés.
+- `results` public accessibles si `results_public` vrai, sinon uniquement propriétaire.
+- `ends_at` est calculé uniquement lors du passage du sondage hors brouillon.
+
+## 3. Auth
+
+### Système en place
+
+- Auth web standard avec `AuthController` : `showRegister`, `register`, `showLogin`, `login`, `logout`.
+- `routes/web.php` utilise `auth` middleware pour :
+  - `/polls/dashboard`
+  - `posts` CRUD (sauf index/show ouverts)
+  - `my-profile`
+  - `likes` update
+  - `tokens` CRUD partiel
+- `routes/api.php` protège les endpoints API de sondages par `auth:sanctum` pour index/store/update/delete/vote.
+- Un endpoint API `/user` protégé `auth:sanctum` renvoie l’utilisateur authentifié.
+
+### Ce qui ne doit pas être touché
+
+- Le système d’authentification de session classique et les routes `auth` existantes.
+- Les endpoints Sanctum/capacités pour `posts` et la gestion des tokens personnels.
+- La logique d’authentification utilisateur dans `AuthController`.
+
+## 4. Backend — état actuel
+
+### Routes API existantes
+
+#### `routes/api.php`
+
+- `GET /api/user` → retourne l’utilisateur via auth Sanctum.
+- `apiResource('v1/posts', ApiPostController::class)` avec middleware de permissions sur `posts:*`.
+- Authentifié (`auth:sanctum`) :
+  - `GET /api/v1/foo` → `ApiFooController@show`
+  - `POST /api/v1/foo` → `ApiFooController@store`
+  - `GET /api/v1/polls` → `ApiPollController@index`
+  - `POST /api/v1/polls` → `ApiPollController@store`
+  - `DELETE /api/v1/polls/{id}` → `ApiPollController@remove`
+  - `PUT /api/v1/polls/{id}` → `ApiPollController@update`
+  - `POST /api/v1/polls/{token}/vote` → `ApiPollController@vote`
+- Public :
+  - `GET /api/v1/polls/{token}` → `ApiPollController@show`
+  - `GET /api/v1/polls/{token}/results` → `ApiPollController@results`
+
+### Ce qui est implémenté
+
+- Dashboard API de sondages de l’utilisateur connecté (`index`).
+- CRUD backend partiel : création (`store`), mise à jour (`update`), suppression (`remove`).
+- Endpoint de vote avec gestion choix unique/multiple, changement de vote, invalidation de vote sur date de fin.
+- Endpoint public de lecture d’un sondage par token et de résultats.
+- Génération d’un `secret_token` unique pour partage.
+
+### Ce qui manque / probable gap
+
+- Pas de validation de droits plus fine côté API pour le propriétaire au-delà de `user_id` sur `update`/`remove`.
+- Pas de endpoints explicites pour gestion des options séparément : les options sont gérées dans `options` comme tableau à `store`/`update`.
+- Pas de scaffold côté API pour créer/éditer un sondage avec champ `is_draft` en tant que page frontend.
+- Pas de contrainte DB unique sur vote utilisateur + sondage / option pour garantir unique à 100% au niveau DB.
+
+### Pattern de réponse API
+
+- Structure JSON mixte :
+  - `return $poll;` ou `return $poll->load('options')` pour renvoyer des modèles.
+  - `response()->json(['message' => '...'], status)` pour erreurs et succès.
+- Pas d’enveloppe uniforme (`data`, `errors`, etc.) visible : retour direct de modèle ou message.
+
+## 5. Frontend — état actuel
+
+### Composants Vue existants
+
+- `resources/js/AppPollDashboard.vue`
+  - Charge les props `polls`, `loginUrl`, `username` depuis un `div` blade.
+  - Monte `PollTable`.
+
+- `resources/js/components/PollTable.vue`
+  - Affiche un tableau de sondages.
+  - Bouton suppression par ligne.
+  - Présente `id`, `title`, `question`, `is_draft`, `started_at`, `ends_at`.
+  - Style scoped minimal pour bouton rouge.
+
+### Frontend store / state
+
+- `resources/js/stores/usePollStore.js`
+  - Composable réactif custom basé sur `ref([])`.
+  - Fournit `setPolls`, `deletePoll`.
+  - Utilise `useFetchApi` pour DELETE.
+  - N’est pas une vraie installation Pinia ; pas de package `pinia` dans `package.json`.
+
+### Composables détectés
+
+- `resources/js/composables/useFetchApi.js` — gestion HTTP `fetch` avec base URL `/api/v1`, timeout, parsing JSON, erreurs.
+- `resources/js/composables/useFetchJson.js` — wrapper `fetch` plus simple.
+- `resources/js/composables/useHashRoute.js` — routeur hash navigateur custom, mais il n’est pas clairement utilisé dans le code chargé.
+- `resources/js/composables/useJsonStorage.js` — sauvegarde de données réactives dans `localStorage`.
+- `resources/js/composables/usePolling.js` — intervalle de polling automatique.
+
+### Vue Router / architecture SPA
+
+- Aucune configuration explicite de Vue Router.
+- L’application est montée uniquement dans `resources/views/polls/dashboard.blade.php` via Vite et Blade.
+- La navigation est majoritairement gérée par routes Laravel côté serveur.
+
+### Points frontend notables
+
+- `resources/js/poll-dashboard.js` monte l’app Vue et passe les données initiales via `data-props` dans Blade.
+- Il y a un package `usePolling.js`, mais aucun composant de polling automatique visible dans le code de sondage actuel.
+- `resources/css/app.css` est importé dans Vite ; Tailwind est disponible mais l’UI de sondage actuelle utilise peu de classes Tailwind et repose sur un tableau HTML simple.
+
+## 6. Décisions implicites détectées
+
+- Architecture mixte Laravel Blade + Vue : Blade pour pages et insertion d’une application Vue là où nécessaire.
+- Vue utilisée de manière légère, sans router ni Pinia officiel.
+- API versionnée comme `/api/v1/...` pour les ressources publiques/privées.
+- `PollController` API traite les options comme un tableau imbriqué plutôt que ressource séparée.
+- L’UI côté sondage renvoie les données initiales du contrôleur Laravel au composant Vue.
+- Usage de `secret_token` dans les polls comme identifiant public pour lecture/vote.
+
+## 7. Écarts avec les exigences du prof
+
+### Fonctionnalités manquantes ou incomplètes
+
+1. Dashboard :
+   - Implémenté partiellement via `polls.dashboard` et `PollTable`.
+   - Manque pagination/filtrage, mais la liste est présente.
+
+2. CRUD complet d'un sondage :
+   - Backend existe pour create/update/delete.
+   - Frontend manque les pages/formulaires de création et modification.
+
+3. Gestion des options :
+   - Backend gère les options par `options[]` en payload.
+   - Frontend n’a pas d’interface d’ajout/modification/suppression d’options.
+
+4. Paramètres avancés :
+   - Champs backend présents (`is_draft`, `allow_multiple_choices`, `allow_vote_change`, `results_public`, `duration`, `ends_at`).
+   - Pas d’UI de configuration de ces paramètres.
+
+5. Lien de partage via token :
+   - Backend génère `secret_token` et endpoints publics existent pour consultation.
+   - **Frontend manque** : le composant de lecture/vote via token et surtout l'affichage du lien de partage dans le dashboard.
+   - Règle : le lien ne s'affiche que pour le créateur (dashboard privé), le destinataire doit être authentifié pour voter.
+
+6. Vote par utilisateur authentifié uniquement :
+   - Backend oblige déjà `auth:sanctum` pour `POST /api/v1/polls/{token}/vote` → ✅ conforme.
+   - Frontend : page/composant de vote manquant.
+
+7. Affichage conditionnel :
+   - Backend a des checks sur état brouillon et date de fin.
+   - L’UI n’expose pas ces états en mode vote/lecture aux utilisateurs.
+
+8. Polling régulier + aperçu graphique :
+   - Composable `usePolling` existe mais n’est pas utilisé pour les résultats de sondage.
+   - Aucun composant graphique visible.
+
+9. Gestion des erreurs frontend :
+   - `useFetchApi` gère les erreurs côté réseau.
+   - Il n’y a pas d’affichage utilisateur d’erreurs dans l’UI sondage.
+
+10. Interface responsive, mobile first :
+   - Le seul composant Vue de sondage est un tableau responsive minimal.
+   - Pas de preuve claire d’une interface mobile-first complète.
+
+11. Endpoints JSON versionnés :
+   - Implémenté correctement avec `/api/v1/...`.
+
+12. Auth existante :
+   - Implémentée via Laravel session et Sanctum ; bien intégré.
+
+### Contraintes techniques
+
+- Laravel >=12 : validé.
+- Vue >=3.4 : validé.
+- DB supportée : SQLite est le défaut ; MySQL/PostgreSQL sont configurables.
+- Modèles/migrations : fournis et utilisés.
+- README : présent avec instructions d’installation.
+- Architecture frontend : mixte Blade + Vue, pas totalement SPA mais cohérente.
+- Composants / composables : présents.
+- Stores Pinia : absent. Le projet utilise un store Vue custom `usePollStore`.
+
+## 8. Spécifications confirmées par le prof
+
+1. **Vote** : L'authentification est **obligatoire**. Aucun vote public n'est autorisé. Le endpoint `/api/v1/polls/{token}/vote` doit rester protégé par `auth:sanctum`.
+
+2. **Lien de partage** : Affiché **uniquement dans le dashboard privé** du créateur. Le créateur voit le lien (avec le token), le copie et l'envoie manuellement. Le destinataire reçoit le lien, accède à la page de vote **seulement s'il est authentifié**.
+
+3. **Route de tokens** : Maintenir la séparation existante. `TokenController` gère les tokens API Sanctum. Les tokens de sondage (`secret_token` sur le modèle `Poll`) passent par les endpoints de `ApiPollController`, pas besoin d'une route supplémentaire.
+
+4. **Store Vue** : Un store Vue custom est **accepté**. Pinia officiel n'est pas obligatoire. Le projet continuera avec `usePollStore` custom.
+
+5. **Multi-langue** : **Pas obligatoire** pour les nouveaux écrans. Reste une possibilité, mais le focus est sur la fonctionnalité de sondage.
+
+---
+
+> Ce fichier est fondé uniquement sur le code présent dans le dépôt et sur les fichiers accessibles. Toute information dépendante de `.env` ou d’un déploiement réel n’a pas pu être confirmée.

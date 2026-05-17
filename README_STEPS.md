@@ -8,6 +8,93 @@ Ce README retrace chaque fonctionalité implémentées et leur fonctionnement.
 ## Boutons
     Mettre un bouton pour accéder directemenet à la page polls/dasboard dans le header via resources/views/components/default-layout.blade.php dans 
 
+## Étape 1 : Architecture Backend + API de base
+
+### Modèles Eloquent
+
+#### `Poll.php`
+- Ajout de `$fillable` avec tous les champs nécessaires :
+  - `user_id` : lie le sondage à son créateur
+  - `title`, `question` : contenu du sondage
+  - `secret_token` : token unique dans l'URL de partage, permet d'identifier le sondage 
+sans exposer son id. Les authentifiés peuvent voter, les non-authentifiés peuvent 
+consulter les résultats si publics.
+  - `is_draft` : booléen pour savoir si le sondage est en brouillon ou publié
+  - `allow_multiple_choices` : autorise ou non plusieurs réponses
+  - `allow_vote_change` : autorise ou non la modification d'un vote
+  - `results_public` : contrôle si les résultats sont visibles avant la fin
+  - `duration` : durée en minutes/heures du sondage après lancement
+  - `started_at`, `ends_at` : dates de début et fin calculées au lancement
+- Relations définies :
+  - `user()` → BelongsTo User (le créateur)
+  - `options()` → HasMany PollOption (les choix du sondage)
+  - `votes()` → HasMany PollVote (tous les votes)
+
+#### `PollOption.php`
+- Ajout de `$fillable` : `['poll_id', 'label']`
+  - `label` est le texte de l'option (ex: "Oui", "Non", "Peut-être")
+- Relations :
+  - `poll()` → BelongsTo Poll
+  - `votes()` → HasMany PollVote (pour compter les votes par option)
+
+#### `PollVote.php`
+- Ajout de `$fillable` : `['poll_id', 'user_id', 'poll_option_id']`
+  - `poll_id` : référence directe au sondage (évite des jointures)
+  - `user_id` : qui a voté (pour empêcher le double vote)
+  - `poll_option_id` : quelle option a été choisie
+- Relations :
+  - `poll()` → BelongsTo Poll
+  - `user()` → BelongsTo User
+  - `option()` → BelongsTo PollOption (clé étrangère explicite `poll_option_id`)
+
+---
+
+### Migrations
+
+#### `poll_options`
+- `id` auto-increment
+- `poll_id` foreignId → contrainte sur `polls` avec cascade delete
+  - Si un sondage est supprimé, ses options sont supprimées automatiquement
+- `label` string : texte de l'option
+- `timestamps()`
+
+#### Pourquoi cascade delete ?
+Pour ne pas laisser des options orphelines en base si le sondage parent est supprimé. C'est une règle d'intégrité référentielle.
+
+---
+
+### Routes API (`/api/v1/`)
+
+#### Routes protégées (auth:sanctum requis)
+| Méthode | Route | Action | Pourquoi protégée |
+|---|---|---|---|
+| GET | `/polls` | Liste des sondages de l'utilisateur | Chaque user voit ses propres sondages |
+| POST | `/polls` | Créer un sondage | Doit être authentifié pour créer |
+| GET | `/polls/{id}` | Détail d'un sondage | Propriétaire uniquement |
+| PUT | `/polls/{id}` | Modifier un sondage | Propriétaire uniquement |
+| DELETE | `/polls/{id}` | Supprimer un sondage | Propriétaire uniquement |
+| POST | `/polls/{id}/vote` | Voter sur un sondage | Doit être connecté pour voter |
+| GET | `/polls/{id}/results` | Voir les résultats | Conditionnel selon `results_public` |
+
+#### Routes publiques (pas d'auth)
+| Méthode | Route | Action | Pourquoi publique |
+|---|---|---|---|
+| GET | `/polls/token/{token}` | Accéder au sondage via lien partagé | Le vote public passe par ce token |
+
+---
+
+### Controller `ApiPollController`
+
+- **Pourquoi un controller dédié API ?** Pour séparer la logique API JSON de la logique web classique. Chaque méthode retourne `response()->json()`.
+- **Versioning `/api/v1/`** : permet de faire évoluer l'API sans casser les clients existants.
+- **Logique de vote** :
+  - Vérifie que le sondage n'est pas en draft
+  - Vérifie que le sondage n'est pas expiré (`ends_at`)
+  - Vérifie si l'utilisateur a déjà voté
+  - Si `allow_vote_change` = true → on met à jour le vote existant
+  - Si `allow_multiple_choices` = true → on accepte plusieurs `poll_option_id`
+  - Sinon → on refuse le double vote
+
 ## Consignes générales
 
 Vous développerez une application web en deux parties :

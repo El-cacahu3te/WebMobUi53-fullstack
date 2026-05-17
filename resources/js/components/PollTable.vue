@@ -1,51 +1,134 @@
 <script setup>
-  import { usePollStore } from '@/stores/usePollStore';
+import { computed, ref } from 'vue';
+import { usePollStore } from '@/stores/usePollStore';
 
-  const { polls, deletePoll } = usePollStore();
+const { polls, deletePoll } = usePollStore();
 
-  async function delPoll(id) {
-    console.log('delete Poll ID:', id);
-    await deletePoll(id);
+// Calcule le statut lisible d'un sondage
+function getPollStatus(poll) {
+    if (poll.is_draft) return 'draft';
+    if (poll.ends_at && new Date(poll.ends_at) < new Date()) return 'ended';
+    return 'active';
+}
+
+const statusLabels = {
+    draft: { label: 'Brouillon', classes: 'bg-gray-100 text-gray-600' },
+    active: { label: 'Actif', classes: 'bg-green-100 text-green-700' },
+    ended: { label: 'Terminé', classes: 'bg-red-100 text-red-600' },
+};
+
+// Construit le lien de partage à partir du token
+function shareLink(token) {
+    return `${window.location.origin}/vote/${token}`;
+}
+// Stocke l'id du sondage dont le lien vient d'être copié
+const copiedId = ref(null);
+
+function copyLink(url, pollId) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(url);
+  } else {
+    const input = document.createElement('input');
+    input.value = url;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
   }
+
+  // Affiche "Copié !" pendant 2 secondes pour ce sondage précis
+  copiedId.value = pollId;
+  setTimeout(() => { copiedId.value = null; }, 2000);
+}
+
+async function delPoll(id) {
+    if (!confirm('Supprimer ce sondage ?')) return;
+    await deletePoll(id);
+}
 </script>
 
 <template>
-  <p v-if="polls.length === 0">Aucun sondage.</p>
+    <!-- État vide -->
+    <div v-if="polls.length === 0" class="text-center py-16 text-gray-500">
+        <p class="text-lg">Aucun sondage pour l'instant.</p>
+        <a href="/polls/create" class="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            Créer mon premier sondage
+        </a>
+    </div>
 
-  <table v-else class="w-full border-collapse text-left">
-    <thead>
-      <tr>
-        <th class="border px-3 py-2">Actions</th>
-        <th class="border px-3 py-2">ID</th>
-        <th class="border px-3 py-2">Titre</th>
-        <th class="border px-3 py-2">Question</th>
-        <th class="border px-3 py-2">Brouillon</th>
-        <th class="border px-3 py-2">Debut</th>
-        <th class="border px-3 py-2">Fin</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-for="poll in polls" :key="poll.id">
-        <td class="border px-3 py-2"><button @click="delPoll(poll.id)">Supp.</button></td>
-        <td class="border px-3 py-2">{{ poll.id }}</td>
+    <!-- Tableau -->
+    <div v-else class="overflow-x-auto">
+        <table class="w-full border-collapse text-left text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="border px-3 py-2">Titre</th>
+                    <th class="border px-3 py-2">Question</th>
+                    <th class="border px-3 py-2">Statut</th>
+                    <th class="border px-3 py-2">Fin</th>
+                    <th class="border px-3 py-2">Lien de partage</th>
+                    <th class="border px-3 py-2">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="poll in polls" :key="poll.id" class="hover:bg-gray-50">
 
-        <td class="border px-3 py-2">{{ poll.title || '-' }}</td>
-        <td class="border px-3 py-2">{{ poll.question }}</td>
-        <td class="border px-3 py-2">{{ poll.is_draft ? 'Oui' : 'Non' }}</td>
-        <td class="border px-3 py-2">{{ poll.started_at || '-' }}</td>
-        <td class="border px-3 py-2">{{ poll.ends_at || '-' }}</td>
-      </tr>
-    </tbody>
-  </table>
+                    <!-- Titre -->
+                    <td class="border px-3 py-2 font-medium">{{ poll.title || '-' }}</td>
+
+                    <!-- Question (tronquée) -->
+                    <td class="border px-3 py-2 text-gray-600 max-w-xs truncate">{{ poll.question }}</td>
+
+                    <!-- Badge statut -->
+                    <td class="border px-3 py-2">
+                        <span
+                            :class="['text-xs font-semibold px-2 py-1 rounded-full', statusLabels[getPollStatus(poll)].classes]">
+                            {{ statusLabels[getPollStatus(poll)].label }}
+                        </span>
+                    </td>
+
+                    <!-- Date de fin -->
+                    <td class="border px-3 py-2 text-gray-500">
+                        {{ poll.ends_at ? new Date(poll.ends_at).toLocaleDateString('fr-CH') : '-' }}
+                    </td>
+
+                    <!-- Lien de partage : seulement si pas brouillon -->
+                    <td class="border px-3 py-2">
+                        <span v-if="poll.is_draft" class="text-gray-400 text-xs italic">
+                            Lancez le sondage pour obtenir un lien
+                        </span>
+                        <div v-else class="flex items-center gap-2">
+                            <code class="text-xs bg-gray-100 px-1 rounded truncate max-w-[180px] block">
+                {{ shareLink(poll.secret_token) }}
+              </code>
+                            <!-- Copie dans le presse-papier -->
+                            <button @click="copyLink(shareLink(poll.secret_token), poll.id)"
+  class="text-xs px-2 py-1 rounded transition-colors"
+  :class="copiedId === poll.id
+    ? 'bg-green-100 text-green-700'
+    : 'text-blue-600 hover:underline'"
+>
+  {{ copiedId === poll.id ? '✓ Copié !' : 'Copier' }}
+                            </button>
+
+                        </div>
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="border px-3 py-2">
+                        <div class="flex gap-2">
+                            <a :href="`/polls/${poll.id}/edit`"
+                                class="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">
+                                Éditer
+                            </a>
+                            <button @click="delPoll(poll.id)"
+                                class="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">
+                                Supprimer
+                            </button>
+                        </div>
+                    </td>
+
+                </tr>
+            </tbody>
+        </table>
+    </div>
 </template>
-
-<style scoped>
-  button {
-    background-color: #e3342f;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    border: none;
-    border-radius: 0.25rem;
-    cursor: pointer;
-  }
-</style>
