@@ -129,6 +129,138 @@ Pour ne pas laisser des options orphelines en base si le sondage parent est supp
 - **Pas de Pinia** : le formulaire est local à la page, pas besoin de store global
 - **Brouillon par défaut** : règle métier confirmée — un sondage ne doit jamais être actif sans action explicite du créateur
 
+# Étape 4 — Lien de partage + Page de vote + Page de résultats
+
+## Ce qui a été fait
+
+### 1. **Pages Blade de vote et résultats**
+
+- `resources/views/polls/vote.blade.php` : page de vote publique (via token)
+- `resources/views/polls/results.blade.php` : page de résultats publique (via token)
+- Utilisation du layout existant `x-vue-app-layout` pour cohérence avec l'app
+- Points de montage Vue : `poll-vote` et `poll-results`
+
+### 2. **Composants Vue**
+
+- `AppPollVote.vue` :
+    
+    - Charge le sondage via `GET /api/v1/polls/{token}`
+    - Affiche titre, question, liste des options
+    - Radio buttons (choix unique) ou checkboxes (choix multiple)
+    - Envoie le vote via `POST /api/v1/polls/{token}/vote` (protégé `auth:sanctum`)
+    - Désactive le formulaire si brouillon ou terminé
+    - Feedback succès et gestion des erreurs
+- `AppPollResults.vue` :
+    
+    - Charge sondage + résultats via `GET /api/v1/polls/{token}` et `GET /api/v1/polls/{token}/results`
+    - Affiche barres de progression Tailwind avec comptages
+    - Affiche nombre total de votes
+    - Respecte le flag `results_public` (confidentiel sauf si créateur)
+    - Polling automatique via `usePolling()` pour rafraîchissement temps réel
+
+### 3. **Points d'entrée Vue**
+
+- `resources/js/poll-vote.js` : initialise `AppPollVote.vue`
+- `resources/js/poll-results.js` : initialise `AppPollResults.vue`
+
+### 4. **Dashboard amélioré**
+
+- `PollTable.vue` :
+    - Badge statut dynamique (Brouillon / Actif / Terminé)
+    - Lien de partage visible **uniquement si sondage actif**
+    - Bouton "Copier" avec Clipboard API
+    - Bouton "Voter" visible seulement si actif
+    - Bouton "Résultats" visible si non brouillon
+
+### 5. **Routes web**
+
+- `GET /polls/{token}/vote` → `PollController@vote()` (groupe `auth`)
+- `GET /polls/{token}/results` → `PollController@results()` (groupe `auth`)
+
+---
+
+## Ce qui a été corrigé
+
+### **Backend — ApiPollController.php**
+
+#### `store()`
+
+- **Avant** : `is_draft` toujours forcé à `true`, impossible de créer actif
+- **Après** : accepte `is_draft` depuis le frontend (défaut `false`)
+- Si sondage actif + durée définie → `started_at` et `ends_at` calculés immédiatement
+
+#### `update()`
+
+- **Avant** : durée et dates ne se synchronisaient pas
+- **Après** : détecte les changements de durée et basculement brouillon ↔ actif
+- Recalcule `ends_at = now() + duration` quand nécessaire
+
+#### `vote()`
+
+- **Avant** : utilisation directe `PollVote::create()` → `poll_id = null` (erreur contrainte)
+- **Après** : utilise `$poll->votes()->create([...])` (relation Eloquent) → `poll_id` toujours renseigné
+
+### **Frontend — PollForm.vue**
+
+#### Initialisation
+
+- **Création** : `is_draft = false` par défaut (sondage actif immédiatement)
+- **Édition** : respecte l'état existant
+
+#### Gestion durée
+
+- **Avant** : durée en minutes, désactivée quand brouillon coché
+- **Après** : durée en **jours** (conversion ÷ 86400), toujours visible mais **désactivée si brouillon**
+- Message clair : « La durée s'applique uniquement si le sondage est actif »
+
+#### Label brouillon
+
+- Clarifié : « Brouillon (coché = brouillon, décoché = actif) »
+
+### **HTTP — useFetchApi.js**
+
+#### Sanctum auth
+
+- **Avant** : cookies de session non envoyés
+- **Après** : ajout `credentials: 'same-origin'` dans `fetch()`
+- Garantit que cookies XSRF/session passent à chaque requête
+
+#### Helpers API
+
+- Expose `get`, `post`, `put`, `del` pour simplifier appels depuis composants
+
+---
+
+## Pourquoi ces changements étaient nécessaires
+
+|Problème|Impact|Solution|
+|---|---|---|
+|Layout manquant|Pages vote/results cassées|Utilisation `x-vue-app-layout`|
+|`is_draft` forcé à true|Impossible créer sondage actif|Backend accepte valeur du frontend|
+|`ends_at` non recalculé|Sondages paraissaient terminés immédiatement|Recalcul dans `store()` et `update()`|
+|`poll_id = null` dans votes|Erreur contrainte DB NOT NULL|Utilisation relation `$poll->votes()->create()`|
+|Durée désactivée si brouillon|UX confuse, impossible saisir durée|Durée toujours visible, désactivée si brouillon|
+|Cookies Sanctum non envoyés|Erreur 401 "Unauthenticated" à chaque vote|`credentials: 'same-origin'` dans fetch|
+
+---
+
+## Fichiers clés
+
+|Fichier|Rôle|Modifié ?|
+|---|---|---|
+|`app/Http/Controllers/Api/v1/ApiPollController.php`|Logique API (store, update, vote)|✅ Oui|
+|`resources/js/components/PollForm.vue`|Formulaire création/édition|✅ Oui|
+|`resources/js/components/PollTable.vue`|Dashboard avec lien de partage|✅ Oui|
+|`resources/js/AppPollVote.vue`|Composant de vote public|🆕 Nouveau|
+|`resources/js/AppPollResults.vue`|Composant de résultats public|🆕 Nouveau|
+|`resources/js/poll-vote.js`|Point d'entrée Vue vote|🆕 Nouveau|
+|`resources/js/poll-results.js`|Point d'entrée Vue résultats|🆕 Nouveau|
+|`resources/views/polls/vote.blade.php`|Page Blade vote|🆕 Nouveau|
+|`resources/views/polls/results.blade.php`|Page Blade résultats|🆕 Nouveau|
+|`resources/js/composables/useFetchApi.js`|HTTP helper|✅ Oui|
+|`routes/web.php`|Routes vote/results|✅ Oui|
+
+
 ## Consignes générales
 
 Vous développerez une application web en deux parties :
@@ -199,6 +331,7 @@ Note maximale : `(nombre de points obtenus / nombre de points maximum) x 5 + 1`
 ## Critères frontend et endpoints JSON
 
 Les informations ci-dessous sont à titre indicatif et peuvent être adaptées.
+
 
 ### Critères rendu
 

@@ -12,10 +12,10 @@ const message = ref('')
 let pollingInterval = null
 
 // Total des votes pour calculer les pourcentages
-const totalVotes = computed(() => {
-  if (!results.value?.options) return 0
-  return results.value.options.reduce((sum, o) => sum + (o.vote_count || 0), 0)
-})
+const totalVotes = computed(() =>
+results.value?.options?.reduce((sum, o) => sum + (o.votes || 0), 0) || 0
+)
+
 
 function getPercentage(count) {
   if (totalVotes.value === 0) return 0
@@ -85,13 +85,13 @@ onUnmounted(() => {
           <div class="flex justify-between text-sm mb-1">
             <span class="font-medium">{{ option.label }}</span>
             <span class="text-gray-500">
-              {{ option.vote_count || 0 }} ({{ getPercentage(option.vote_count || 0) }}%)
+              {{ option.votes || 0 }} ({{ getPercentage(option.votes || 0) }}%)
             </span>
           </div>
           <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
             <div
               class="bg-blue-600 h-full rounded-full transition-all duration-500"
-              :style="{ width: getPercentage(option.vote_count || 0) + '%' }"
+              :style="{ width: getPercentage(option.votes || 0) + '%' }"
             ></div>
           </div>
         </div>

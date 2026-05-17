@@ -4,6 +4,9 @@
 
 - Backend: Laravel projet (`composer.json` avec `laravel/framework` `^12.0`, PHP `^8.2`).
 - Frontend: Vue 3 (`vue` `^3.5.18`, `@vitejs/plugin-vue`), Vite 7, Tailwind CSS 4 via `@tailwindcss/vite`.
+
+- Documentation: `README_STEPS.md` documente l’alignement de la fonctionnalité “lien de partage token + accès au sondage via lien” comme **critère rendu #5** (plutôt qu’une “Étape 5” technique dédiée), et la fonctionnalité est couverte techniquement via les pages vote/résultats et les endpoints token.
+
 - API: Laravel Sanctum est activé (`laravel/sanctum` et `HasApiTokens` sur le modèle `User`).
 - Base de données: config `config/database.php` par défaut `sqlite`, mais les connexions MySQL, MariaDB et PostgreSQL sont présentes. Le fichier `.env` n’est pas fourni dans le dépôt, seulement `.env.example`.
 - Build: `package.json` expose `npm run dev` et `npm run build`. `composer.json` contient aussi `composer run dev` et `php artisan` commands.
@@ -40,13 +43,13 @@
 
 ### Règles métier détectées
 
-- Sondage créé toujours comme `is_draft = true`.
+- Sondage créé par défaut actif lorsque le frontend envoie `is_draft = false`; un bug antérieur enregistrait systématiquement en brouillon.
 - `vote` autorisé seulement si sondage non brouillon et si `ends_at` n’est pas dépassé.
 - Pour un sondage simple, l’API bloque `option_ids` de longueur > 1.
 - Si `allow_vote_change` est faux, un second vote est refusé.
 - Si `allow_vote_change` est vrai, les anciens votes pour ce sondage sont supprimés et remplacés.
 - `results` public accessibles si `results_public` vrai, sinon uniquement propriétaire.
-- `ends_at` est calculé uniquement lors du passage du sondage hors brouillon.
+- `ends_at` est recalculé lors du passage du sondage hors brouillon ou lorsque la durée change.
 
 ## 3. Auth
 
@@ -91,17 +94,18 @@
 ### Ce qui est implémenté
 
 - Dashboard API de sondages de l’utilisateur connecté (`index`).
-- CRUD backend partiel : création (`store`), mise à jour (`update`), suppression (`remove`).
+- CRUD backend complet : création (`store`), mise à jour (`update`), suppression (`remove`).
 - Endpoint de vote avec gestion choix unique/multiple, changement de vote, invalidation de vote sur date de fin.
-- Endpoint public de lecture d’un sondage par token et de résultats.
+- Endpoint public de lecture d’un sondage par token (`show`) et de résultats (`results`).
 - Génération d’un `secret_token` unique pour partage.
+- Gestion de la publication/durée dans `store()` et `update()` : `is_draft`, `started_at`, `ends_at`.
+- Correction de vote via relation (`$poll->votes()->create(...)`) pour éviter `poll_id` null.
 
 ### Ce qui manque / probable gap
 
 - Pas de validation de droits plus fine côté API pour le propriétaire au-delà de `user_id` sur `update`/`remove`.
 - Pas de endpoints explicites pour gestion des options séparément : les options sont gérées dans `options` comme tableau à `store`/`update`.
-- Les endpoints API de création/édition sont en place et le frontend dispose désormais de pages `polls.create` et `polls.edit` avec `PollForm.vue`.
-- Pas de page de vote publique côté frontend ni de résultats graphiques visibles.
+- Pas de tests automatisés de bout en bout pour la création / vote / résultats.
 - Pas de contrainte DB unique sur vote utilisateur + sondage / option pour garantir unique à 100% au niveau DB.
 
 ### Pattern de réponse API
@@ -150,7 +154,6 @@
 ### Composables détectés
 
 - `resources/js/composables/useFetchApi.js` — gestion HTTP `fetch` avec base URL `/api/v1`, timeout, parsing JSON, erreurs.
-  - **Correction Sanctum** : `credentials: 'same-origin'` ajouté pour que cookies de session/XSRF soient envoyés.
   - **Correction Sanctum** : `credentials: 'same-origin'` ajouté pour que cookies de session/XSRF soient envoyés.
 - `resources/js/composables/useFetchJson.js` — wrapper `fetch` plus simple.
 - `resources/js/composables/useHashRoute.js` — routeur hash navigateur custom, mais il n’est pas clairement utilisé dans le code chargé.
@@ -203,16 +206,16 @@
 
 5. Lien de partage via token :
    - Backend génère `secret_token` et endpoints publics existent pour consultation.
-   - **Frontend manque** : le composant de lecture/vote via token et surtout l'affichage du lien de partage dans le dashboard.
-   - Règle : le lien ne s'affiche que pour le créateur (dashboard privé), le destinataire doit être authentifié pour voter.
+   - Frontend dispose maintenant de pages de vote et de résultats par token.
+   - Règle : le lien reste affiché uniquement pour le créateur dans le dashboard privé ; le destinataire doit être authentifié pour voter.
 
 6. Vote par utilisateur authentifié uniquement :
    - Backend oblige déjà `auth:sanctum` pour `POST /api/v1/polls/{token}/vote` → ✅ conforme.
-   - Frontend : page/composant de vote manquant.
+   - Frontend a désormais une page/composant de vote fonctionnelle.
 
 7. Affichage conditionnel :
    - Backend a des checks sur état brouillon et date de fin.
-   - L’UI n’expose pas ces états en mode vote/lecture aux utilisateurs.
+   - L’UI expose partiellement ces états dans les pages vote/résultats, mais des améliorations UX restent possibles.
 
 8. Polling régulier + aperçu graphique :
    - Composable `usePolling` existe mais n’est pas utilisé pour les résultats de sondage.
@@ -284,6 +287,10 @@
    - Correction : utilise `$poll->votes()->create([...])` (relation) au lieu de `PollVote::create(...)`.
    - Garantit que `poll_id` est toujours renseigné, évite contrainte NOT NULL.
 
+4. **Vote/résultats frontend** :
+   - Pages Blade `polls.vote` et `polls.results` corrigées (`x-vue-app-layout`, vue de fichier renommé).
+   - Composants `AppPollVote.vue` et `AppPollResults.vue` exploitent les helpers API `useFetchApi.js`.
+
 #### Frontend (`resources/js/components/PollForm.vue`)
 
 1. **Initialisation** :
@@ -305,6 +312,8 @@
 1. **Sanctum auth** :
    - Ajout `credentials: 'same-origin'` dans `fetch()`.
    - Garantit que cookies de session/XSRF sont envoyés à chaque requête.
+2. **Helpers API** :
+   - `get`, `post`, `put`, `del` exposés pour simplifier les appels depuis `AppPollVote.vue` et `AppPollResults.vue`.
 
 ### Résultat
 
@@ -316,11 +325,11 @@
 
 ### Étape 4 — Prochaines étapes
 
-- [ ] Frontend : créer page `/vote/{token}` pour voter publiquement (authentifié).
-- [ ] Frontend : créer page résultats graphiques `/results/{token}`.
-- [ ] Frontend : afficher lien de partage dans dashboard (copie automatique).
-- [ ] Frontend : interface de vote (choix radio/checkbox selon `allow_multiple_choices`).
-- [ ] Frontend : affichage du statut sondage (actif/terminé/brouillon).
+- [x] Frontend : page `/vote/{token}` pour voter publiquement (authentifié) implémentée.
+- [x] Frontend : page résultats graphiques `/results/{token}` implémentée.
+- [x] Frontend : lien de partage manipulable dans le dashboard.
+- [x] Frontend : interface de vote avec choix unique/multiple.
+- [x] Frontend : affichage du statut sondage dans les pages vote/résultats.
 - [ ] Tests : vérifier contrainte unique vote utilisateur + sondage.
 - [ ] Tests : intégration complète création → vote → résultats.
 

@@ -10,8 +10,9 @@ const props = defineProps({
 const { fetchApi } = useFetchApi('/api/v1');
 
 const isDraftInitial = props.mode === 'create'
-  ? true
-  : props.initialPoll?.is_draft ?? true;
+? false  // création = actif par défaut
+: props.initialPoll?.is_draft ?? false;
+
 
 const form = reactive({
   title: props.initialPoll?.title ?? '',
