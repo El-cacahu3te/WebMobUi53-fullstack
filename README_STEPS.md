@@ -307,6 +307,28 @@ Pour ne pas laisser des options orphelines en base si le sondage parent est supp
 - `resources/js/composables/usePolling.js`
 - `resources/js/AppPollResults.vue`
 
+## Étape 8 — Polling + Graphique des résultats ✅
+
+### Ce qui a été fait
+- Intégration du composable `usePolling` dans `AppPollResults.vue`
+- Rafraîchissement automatique des résultats toutes les 5 secondes
+- Graphique en barres horizontales (CSS/Tailwind, pas de lib externe)
+- Cycle de couleurs pour les options (vert → teal → émeraude)
+- Indicateur visuel "Actualisation..." pendant le polling
+- Arrêt automatique du polling si erreur 403 (résultats privés)
+
+### Pourquoi ces choix
+- **Polling 5s** : équilibre réactivité/réseau. Configurable si besoin.
+- **Barres CSS** : aucune dépendance externe, léger, facile à modifier.
+- **Arrêt sur 403** : pas de requêtes inutiles si permission refusée (brouillon ou privé).
+- **Arrêt au unmount** : composable `usePolling` gère le cleanup automatiquement.
+
+### Règles métier appliquées
+- Un sondage en brouillon n'est **jamais accessible** via token → 403 automatique
+- Badge brouillon supprimé (dead code — impossible d'avoir un brouillon visible)
+- Polling s'arrête naturellement si sondage expiré (condition `isExpired` vérifiée avant chaque refresh)
+
+
 ## Consignes générales
 
 Vous développerez une application web en deux parties :
