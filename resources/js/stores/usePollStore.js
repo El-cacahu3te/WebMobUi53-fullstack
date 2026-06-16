@@ -4,27 +4,18 @@ import { useFetchApi } from '@/composables/useFetchApi';
 const polls = ref([]);
 
 export function usePollStore() {
-    const { fetchApi } = useFetchApi('/api/v1');
-
+  const { fetchApi } = useFetchApi();
 
   function setPolls(data) {
     polls.value = data;
   }
 
   async function deletePoll(id) {
-    const result = await fetchApi({ url: 'polls/' + id, method: 'DELETE' }); //back
+    const result = await fetchApi({ url: 'polls/' + id, method: 'DELETE' });
     if (result) {
-      polls.value = polls.value.filter(p => p.id !== id); //front
+      polls.value = polls.value.filter(p => p.id !== id);
     }
   }
-    async function deletePolls(ids) {
-        for (const id of ids) {
-        const result = await fetchApi({ url: 'polls/' + id, method: 'DELETE' }); //back
-        if (result) {
-            polls.value = polls.value.filter(p => p.id !== id); //front
-        }}
-    }
-
 
   return { polls, setPolls, deletePoll };
 }

@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\v1\ApiPostController;
-use App\Http\Controllers\Api\v1\ApiFooController;
 use App\Http\Controllers\Api\v1\ApiPollController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -18,8 +17,6 @@ Route::apiResource('v1/posts', ApiPostController::class)
 
 //authentifé
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/v1/foo', [ApiFooController::class, 'show']);
-    Route::post('/v1/foo', [ApiFooController::class, 'store']);
     Route::get('/v1/polls', [ApiPollController::class, 'index']);
     Route::post('/v1/polls', [ApiPollController::class, 'store']);
     Route::delete('/v1/polls/{id}', [ApiPollController::class, 'remove']);

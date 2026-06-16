@@ -9,7 +9,7 @@ import AlertMessage from './components/AlertMessage.vue'
 
 
 const props = defineProps({ token: String })
-const { get } = useFetchApi('/api/v1')
+const { get } = useFetchApi()
 
 const results      = ref(null)
 const loading      = ref(true)

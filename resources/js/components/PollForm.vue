@@ -8,7 +8,7 @@ const props = defineProps({
   initialPoll: { type: Object, default: null }
 })
 
-const { fetchApi } = useFetchApi('/api/v1')
+const { fetchApi } = useFetchApi()
 
 // Règle métier : à la création, sondage ACTIF par défaut (is_draft = false)
 // À l'édition, respecte l'état existant

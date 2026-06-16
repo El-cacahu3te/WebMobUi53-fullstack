@@ -4,7 +4,7 @@ import { useFetchApi } from './composables/useFetchApi'
 import AlertMessage from './components/AlertMessage.vue'
 
 const props = defineProps({ token: String })
-const { get, post } = useFetchApi('/api/v1')
+const { get, post } = useFetchApi()
 
 const poll            = ref(null)
 const selectedOptions = ref([])
