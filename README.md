@@ -1,3 +1,31 @@
+# Application de sondage — Laravel + Vue.js
+
+Application fullstack de création et gestion de sondages. Les utilisateurs authentifiés créent et gèrent leurs sondages depuis un dashboard. Les sondages actifs sont accessibles via un lien à token pour voter et consulter les résultats en temps réel.
+
+## Installation
+
+```bash
+# 1. Dépendances
+composer install
+npm install
+
+# 2. Configuration
+cp .env.example .env
+php artisan key:generate
+
+# 3. Base de données
+php artisan migrate
+
+# 4. Lancer l'application
+composer run dev
+```
+
+L'application est accessible sur **http://127.0.0.1:8000**.
+
+> **Note Windows + Herd** : le script `dev` utilise `php -S` directement plutôt qu'`artisan serve` pour contourner une incompatibilité entre `proc_open()` PHP et le wrapper `.bat` de Herd.
+
+---
+
 # Intégration Sanctum SPA (Vue.js)
 
 ## Principe
