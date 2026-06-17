@@ -24,9 +24,7 @@ class ApiPollController extends Controller
      */
     public function show(string $token)
     {
-        $poll = Poll::with(['options' => function ($query) {
-            $query->withCount('votes');
-        }])->where('secret_token', $token)->first();
+        $poll = Poll::with('options')->where('secret_token', $token)->first();
 
         if (!$poll) {
             return response()->json(['message' => 'Poll not found.'], 404);
